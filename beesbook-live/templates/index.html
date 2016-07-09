@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="refresh" content="20" >
+<link rel="stylesheet" href="normalize.css">
+<link rel="stylesheet" href="typeplate.css">
+<link rel="stylesheet" href="main.css">
+</head>
+<body>
+<h2>Beesbook live</h2>
+<div class="grid">
+  <div class="col-2-3">
+     <h5>Cam0</h5>
+     <img src="{{ cam0 }}" alt="Cam0 live preview" style="width:100%;height:auto;">
+  </div>
+  <div class="col-1-3">
+     <h5>Cam1</h5>
+     <img src="{{ cam1 }}" alt="Cam1 live preview" style="width:100%;height:auto;">
+  </div>
+</div>
+</p>
+<div class="grid">
+  <div class="col-2-3">
+     <h5>Cam2</h5>
+     <img src="{{ cam2 }}" alt="Cam2 live preview" style="width:100%;height:auto;">
+  </div>
+  <div class="col-1-3">
+     <h5>Cam3</h5>
+     <img src="{{ cam3 }}" alt="Cam3 live preview" style="width:100%;height:auto;">
+  </div>
+</div>
+<h3>Image metrics over time</h3>
+<div class="center">
+<img src="{{ smd }}" alt="smd history" style="width:100%;height:auto;">
+</div>
+<div class="center">
+<img src="{{ variance }}" alt="variance history" style="width:100%;height:auto;">
+</div>
+<div class="center">
+<img src="{{ noise }}" alt="noise history" style="width:100%;height:auto;">
+</div>
+<div class="center">
+<img src="{{ contrast }}" alt="contrast history" style="width:100%;height:auto;">
+</div>
+<div class="footer">
+<h6>Last updated: {{ last_updated }}</h6>
+</div>
+</body>
+</html>
