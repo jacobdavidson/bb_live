@@ -38,7 +38,8 @@ def get_fig_bytes(format='png', **kwargs):
 
 class CreateLiveSiteHandler(pyinotify.ProcessEvent):
     def __init__(self, output_fname, source_dir, template='index.html', min_interval=30,
-                 analysis_metrics=('filename', 'smd', 'variance', 'noise')):
+                 analysis_metrics=('filename', 'smd', 'variance', 'noise'),
+                 camera_rotations={0: 1, 1: -1, 2:1, 3:-1}):
         env = Environment(loader=PackageLoader('beesbook-live', 'templates'))
         self.template = env.get_template(template)
         self.min_interval = min_interval
@@ -47,7 +48,7 @@ class CreateLiveSiteHandler(pyinotify.ProcessEvent):
         self.access_history = defaultdict(lambda: datetime.fromtimestamp(0))
         self.uris = defaultdict(str)
 
-        self.rotations = {0: 1, 1: -1, 2:1, 3:-1}
+        self.rotations = camera_rotations
 
         self.analysis_metrics = analysis_metrics
         self.analysis_paths = [os.path.join(source_dir, f) for f in
@@ -63,16 +64,25 @@ class CreateLiveSiteHandler(pyinotify.ProcessEvent):
             dfs.append(analysis)
         analysis = pd.concat(dfs)
         analysis.sort('datetime', inplace=True)
+        return analysis
 
-        for column in ('smd', 'variance', 'contrast', 'noise'):
+    def plot_analysis(self, analysis):
+        for column in self.analysis_metrics[1:]:
             fig, ax = plt.subplots(1, figsize=(16, 4), facecolor='white')
             for camIdx in (0, 1, 2, 3):
-                analysis[analysis.camIdx==camIdx].plot('datetime', column, label='cam{}'.format(camIdx),
+                analysis[analysis.camIdx==camIdx].plot('datetime', column,
+                                                       label='cam{}'.format(camIdx),
                                                        title=column, ax=ax)
             ax.legend(loc='upper left')
-            ax.set_xlabel('Time')
+            ax.set_xlabel('time')
             self.uris[column] = get_b64_uri(get_fig_bytes())
         plt.close('all')
+
+    def process_image(self, path, fname):
+        im = imread(path)
+        camIdx = fname.split('.')[0][-1]
+        im = rot90(im, self.rotations[int(camIdx)])
+        self.uris['cam{}'.format(camIdx)] = get_b64_uri(get_image_bytes(im))
 
     def process_IN_CLOSE_WRITE(self, event):
         path = os.path.join(event.path, event.name)
@@ -82,16 +92,14 @@ class CreateLiveSiteHandler(pyinotify.ProcessEvent):
         if time_since.seconds >= self.min_interval:
             update = True
             if event.name.startswith('cam'):
-                camIdx = event.name.split('.')[0][-1]
-                logging.info('Updating cam {}'.format(camIdx))
+                logging.info('Updating {}'.format(event.name))
                 self.access_history[path] = now
                 time.sleep(1)
-                im = imread(path)
-                im = rot90(im, self.rotations[int(camIdx)])
-                self.uris['cam{}'.format(camIdx)] = get_b64_uri(get_image_bytes(im))
+                self.process_image(path, event.name)
             elif event.name.startswith('analysis'):
                 logging.info('Updating {}'.format(event.name))
-                self.parse_analysis()
+                self.access_history[path] = now
+                self.plot_analysis(self.parse_analysis())
             else:
                 update = False
                 logging.info('Event ignored: {}'.format(event))
