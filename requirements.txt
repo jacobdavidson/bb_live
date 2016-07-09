@@ -1,0 +1,10 @@
+numpy>=1.10.2
+scipy>=0.16.1
+Jinja2>=2.8
+pytz>=2014.0
+matplotlib>=1.5.0
+seaborn>=0.7.0
+pyinotify>=0.9.0
+git+git://github.com/BioroboticsLab/bb_binary.git#egg=bb_binary
+git+git://https://github.com/BioroboticsLab/deeppipeline#egg=pipeline
+
