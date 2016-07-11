@@ -21,13 +21,13 @@ sns.set_style('whitegrid')
 from bb_binary import parse_image_fname_beesbook
 
 
-def get_b64_uri(bytes):
-    src = 'data:image/jpeg;base64,{0}'
-    return src.format(b64encode(bytes.getvalue()).decode('utf-8'))
+def get_b64_uri(bytes, format):
+    src = 'data:image/{0};base64,{1}'
+    return src.format(format, b64encode(bytes.getvalue()).decode('utf-8'))
 
-def get_image_bytes(image):
+def get_image_bytes(image, format='jpeg'):
     b = BytesIO()
-    imsave(b, image, 'jpeg')
+    imsave(b, image, format)
     return b
 
 def get_fig_bytes(format='png', **kwargs):
@@ -75,14 +75,14 @@ class CreateLiveSiteHandler(pyinotify.ProcessEvent):
                                                        title=column, ax=ax)
             ax.legend(loc='upper left')
             ax.set_xlabel('time')
-            self.uris[column] = get_b64_uri(get_fig_bytes())
+            self.uris[column] = get_b64_uri(get_fig_bytes(), format='png')
         plt.close('all')
 
     def process_image(self, path, fname):
         im = imread(path)
         camIdx = fname.split('.')[0][-1]
         im = rot90(im, self.rotations[int(camIdx)])
-        self.uris['cam{}'.format(camIdx)] = get_b64_uri(get_image_bytes(im))
+        self.uris['cam{}'.format(camIdx)] = get_b64_uri(get_image_bytes(im), format='jpeg')
 
     def process_IN_CLOSE_WRITE(self, event):
         path = os.path.join(event.path, event.name)
