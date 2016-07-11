@@ -19,6 +19,8 @@ import seaborn as sns
 sns.set_style('whitegrid')
 
 from bb_binary import parse_image_fname_beesbook
+from pipeline import Pipeline
+from pipeline.objects import Image, ResultVisualization, IDs
 
 
 def get_b64_uri(bytes, format):
@@ -36,20 +38,46 @@ def get_fig_bytes(format='png', **kwargs):
     return b
 
 
-class CreateLiveSiteHandler(pyinotify.ProcessEvent):
-    def __init__(self, output_fname, source_dir, template='index.html', min_interval=30,
-                 analysis_metrics=('filename', 'smd', 'variance', 'noise'),
-                 camera_rotations={0: 1, 1: -1, 2:1, 3:-1}):
+class SiteBuilder:
+    def __init__(self, output_fname, template='index.html', min_interval=30):
         env = Environment(loader=PackageLoader('beesbook-live', 'templates'))
         self.template = env.get_template(template)
         self.min_interval = min_interval
         self.output_fname = output_fname
-
-        self.access_history = defaultdict(lambda: datetime.fromtimestamp(0))
         self.uris = defaultdict(str)
 
-        self.rotations = camera_rotations
+    def update_uri(self, key, value):
+        self.uris[key] = value
 
+    def build(self):
+        html = self.template.render(last_updated=datetime.now(), **self.uris)
+        open(self.output_fname, 'w').write(html)
+
+
+class ImageHandler:
+    def __init__(self, site_builder, pipeline_config, camera_rotations={0: 1, 1: -1, 2:1, 3:-1}):
+        self.builder = site_builder
+        self.rotations = camera_rotations
+        self.pipeline = Pipeline([Image], [ResultVisualization, IDs], **pipeline_config)
+
+    def run_pipeline(self, image):
+        results = self.pipeline([image])
+        return results[ResultVisualization], results[IDs]
+
+    def process_image(self, path, fname):
+        im = imread(path)
+        im, ids = self.run_pipeline(im)
+
+        camIdx = fname.split('.')[0][-1]
+        im = rot90(im, self.rotations[int(camIdx)])
+        self.builder.update_uri('cam{}'.format(camIdx),
+                                get_b64_uri(get_image_bytes(im), format='jpeg'))
+
+
+class AnalysisHandler:
+    def __init__(self, source_dir, site_builder,
+                 analysis_metrics=('filename', 'smd', 'variance', 'noise')):
+        self.builder = site_builder
         self.analysis_metrics = analysis_metrics
         self.analysis_paths = [os.path.join(source_dir, f) for f in
                                os.listdir(source_dir) if f.startswith('analysis')]
@@ -75,14 +103,19 @@ class CreateLiveSiteHandler(pyinotify.ProcessEvent):
                                                        title=column, ax=ax)
             ax.legend(loc='upper left')
             ax.set_xlabel('time')
-            self.uris[column] = get_b64_uri(get_fig_bytes(), format='png')
+            self.builder.update_uri(column, get_b64_uri(get_fig_bytes(), format='png'))
         plt.close('all')
 
-    def process_image(self, path, fname):
-        im = imread(path)
-        camIdx = fname.split('.')[0][-1]
-        im = rot90(im, self.rotations[int(camIdx)])
-        self.uris['cam{}'.format(camIdx)] = get_b64_uri(get_image_bytes(im), format='jpeg')
+    def update(self):
+        self.plot_analysis(self.parse_analysis())
+
+
+class FileEventHandler(pyinotify.ProcessEvent):
+    def __init__(self, source_dir, site_builder, pipeline_config):
+        self.access_history = defaultdict(lambda: datetime.fromtimestamp(0))
+        self.builder = site_builder
+        self.hndl_analysis = AnalysisHandler(source_dir, self.builder)
+        self.hndl_image = ImageHandler(self.builder, pipeline_config)
 
     def process_IN_CLOSE_WRITE(self, event):
         path = os.path.join(event.path, event.name)
@@ -91,19 +124,19 @@ class CreateLiveSiteHandler(pyinotify.ProcessEvent):
         time_since = now - last_access
         if time_since.seconds >= self.min_interval:
             update = True
+            self.access_history[path] = now
             if event.name.startswith('cam'):
                 logging.info('Updating {}'.format(event.name))
-                self.access_history[path] = now
                 time.sleep(1)
-                self.process_image(path, event.name)
+                self.hndl_image.process_image(path, event.name)
             elif event.name.startswith('analysis'):
                 logging.info('Updating {}'.format(event.name))
                 self.access_history[path] = now
-                self.plot_analysis(self.parse_analysis())
+                self.hndl_analysis.update()
             else:
-                update = False
                 logging.info('Event ignored: {}'.format(event))
+                update = False
+                del self.access_history[path]
 
             if update:
-                html = self.template.render(last_updated=now, **self.uris)
-                open(self.output_fname, 'w').write(html)
+                self.builder.build()
