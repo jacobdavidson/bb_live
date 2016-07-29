@@ -10,7 +10,7 @@ setup(
     name='bb_live',
     version='0.0.1',
     description='',
-    scripts=[pjoin('bin', 'run')],
+    scripts=[pjoin('bin', 'run.py')],
     install_requires=reqs,
     dependency_links=dep_links,
     packages=['bb_live']
