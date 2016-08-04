@@ -5,7 +5,7 @@ import json
 import logging
 import pyinotify
 
-from bb_live import FileEventHandler, SiteBuilder
+from bb_live import FileEventHandler, SiteBuilder, PeriodicHiveAnalysis
 
 
 if __name__ == '__main__':
@@ -28,5 +28,8 @@ if __name__ == '__main__':
     handler = FileEventHandler(args.source_dir, builder, pipeline_config, min_interval=args.interval)
     notifier = pyinotify.Notifier(wm, handler)
     wm.add_watch(args.source_dir, pyinotify.IN_CLOSE_WRITE)
+
+    hive_analysis = PeriodicHiveAnalysis(interval=3600, builder=builder)
+    hive_analysis.run_periodic()
 
     notifier.loop()
