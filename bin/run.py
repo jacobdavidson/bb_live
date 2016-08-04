@@ -9,8 +9,6 @@ from bb_live import FileEventHandler, SiteBuilder, PeriodicHiveAnalysis
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s', level=logging.INFO)
-
     parser = argparse.ArgumentParser(description='Create a static beesbook live view website')
     parser.add_argument("source_dir", help="Path to directory where live preview images and " + \
                                            "analysis files are stored", type=str)
@@ -18,8 +16,12 @@ if __name__ == '__main__':
     parser.add_argument("pipeline_config", help="Path to json config file for the pipeline", type=str)
     parser.add_argument("--interval", help="Ignore file events that occur more frequently than " + \
                                          "this interval", default=30, type=int)
+    parser.add_argument("--debug", help="Print debug logging messages", default=False, type=bool)
 
     args = parser.parse_args()
+
+    logging.basicConfig(format='%(levelname)s:%(asctime)s %(message)s',
+                        level=logging.DEBUG if args.debug else logging.INFO)
 
     pipeline_config = json.loads(open(args.pipeline_config, 'r').read())
 

@@ -31,6 +31,15 @@ from pipeline.objects import Image, FinalResultOverlay, IDs, LocalizerInputImage
 from pipeline.stages import ResultCrownVisualizer
 
 
+def timeit(method):
+    def timed(*args, **kw):
+        ts = time.time()
+        result = method(*args, **kw)
+        te = time.time()
+        logging.debug('{0} finished in {1:.2f} seconds'.format(method.__name__, te - ts))
+        return result
+    return timed
+
 def get_b64_uri(bytes, format):
     src = 'data:image/{0};base64,{1}'
     return src.format(format, b64encode(bytes.getvalue()).decode('utf-8'))
@@ -169,10 +178,12 @@ class ImageHandler:
         else:
             self.detections = []
 
+    @timeit
     def run_pipeline(self, image):
         results = self.pipeline([image])
         return results
 
+    @timeit
     def plot_detections(self, num_plot_samples=1000, std_window_size=25):
         detections = pd.DataFrame(self.detections, columns=('datetime', 'camIdx', 'id', 'confidence'))
 
@@ -222,6 +233,7 @@ class ImageHandler:
         self.builder.save_tab_image('detections', 'bees', 'hive', idx=0, format='png')
         plt.close('all')
 
+    @timeit
     def process_image(self, path, fname):
         im = imread(path)
         camIdx = fname.split('.')[0][-1]
@@ -265,6 +277,7 @@ class AnalysisHandler:
         self.analysis_paths = [os.path.join(source_dir, f) for f in
                                os.listdir(source_dir) if f.startswith('analysis')]
 
+    @timeit
     def parse_analysis(self):
         dfs = []
         for fn in self.analysis_paths:
@@ -277,6 +290,7 @@ class AnalysisHandler:
         analysis.sort_values('datetime', inplace=True)
         return analysis
 
+    @timeit
     def plot_analysis(self, analysis):
         for column in self.analysis_metrics[1:]:
             fig, ax = plt.subplots(1, figsize=(16, 4), facecolor='white')
@@ -333,6 +347,7 @@ class PeriodicHiveAnalysis:
 
         return unique, counts
 
+    @timeit
     def plot_analysis(self, unique_detections_hourly, time_delta):
         fig, ax = plt.subplots(1, 1, figsize=(16, 4), facecolor='white')
         median_detections = unique_detections_hourly.rolling(center=False, min_periods=2, window=10).median()
@@ -358,6 +373,7 @@ class PeriodicHiveAnalysis:
 
         plt.close('all')
 
+    @timeit
     def plot_age_distribution(self, ages):
         fig, ax = plt.subplots(1, 1, figsize=(16, 4), facecolor='white')
         sns.distplot(ages, bins=8, hist=True,
@@ -378,6 +394,7 @@ class PeriodicHiveAnalysis:
 
         plt.close('all')
 
+    @timeit
     def analyse_age_distribution(self, unique, counts):
         urllib.request.urlretrieve('https://www.dropbox.com/s/ze3chu5mvetjwv2/TagsControl2016.xlsx?dl=1',
                                    'TagsControl2016.xlsx')
@@ -405,12 +422,11 @@ class PeriodicHiveAnalysis:
 
         self.plot_age_distribution(ages)
 
+    @timeit
     def run_periodic(self):
         logging.info('Running periodic analysis')
 
         try:
-            start_measure_time = time.time()
-
             # load bb_live detections and convert to pandas dataframe
             detections = pickle.load(open(self.detections_path, 'rb'))
             detections = pd.DataFrame(detections, columns=('datetime', 'camIdx', 'id', 'confidence'))
@@ -442,8 +458,6 @@ class PeriodicHiveAnalysis:
             self.plot_analysis(unique_detections_hourly, time_delta)
 
             self.analyse_age_distribution(unique, counts)
-
-            logging.info('Analysis finished in {} seconds'.format(time.time() - start_measure_time))
         except Exception as err:
             logging.error(err)
 
