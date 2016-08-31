@@ -27,6 +27,7 @@ sns.set_style('whitegrid')
 
 from bb_binary import parse_image_fname_beesbook, get_timezone
 from pipeline import Pipeline
+from pipeline.pipeline import get_auto_config
 from pipeline.objects import Image, FinalResultOverlay, IDs, LocalizerInputImage, CrownOverlay, SaliencyOverlay
 from pipeline.stages import ResultCrownVisualizer
 
@@ -162,14 +163,13 @@ class SiteBuilder:
 
 
 class ImageHandler:
-    def __init__(self, site_builder, pipeline_config,
+    def __init__(self, site_builder,
                  camera_rotations={0: 1, 1: -1, 2:1, 3:-1},
                  detections_path='detections.pkl'):
         self.builder = site_builder
         self.rotations = camera_rotations
         self.pipeline = Pipeline([Image], [LocalizerInputImage, FinalResultOverlay, CrownOverlay,
-                                           IDs, SaliencyOverlay],
-                                 **pipeline_config)
+                                           IDs, SaliencyOverlay], **get_auto_config())
         self.crown = ResultCrownVisualizer()
 
         self.detections_path = detections_path
@@ -465,11 +465,11 @@ class PeriodicHiveAnalysis:
 
 
 class FileEventHandler(pyinotify.ProcessEvent):
-    def __init__(self, source_dir, site_builder, pipeline_config, min_interval):
+    def __init__(self, source_dir, site_builder, min_interval):
         self.access_history = defaultdict(lambda: get_timezone().localize(datetime.fromtimestamp(0)))
         self.builder = site_builder
         self.hndl_analysis = AnalysisHandler(source_dir, self.builder)
-        self.hndl_image = ImageHandler(self.builder, pipeline_config)
+        self.hndl_image = ImageHandler(self.builder)
         self.min_interval = min_interval
 
     def process_IN_CLOSE_WRITE(self, event):
