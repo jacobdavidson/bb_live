@@ -9,6 +9,10 @@ from collections import defaultdict
 from io import BytesIO
 
 import matplotlib as mpl
+mpl.use('Agg')  # noqa
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 import pandas as pd
 import pyinotify
 from jinja2 import Environment, PackageLoader
@@ -18,7 +22,6 @@ from numpy import rot90
 from scipy.misc import imread, imsave
 from datetime import datetime
 from scipy.interpolate import interp1d
-from skimage import exposure
 
 from bb_binary import parse_image_fname_beesbook, get_timezone
 from pipeline import Pipeline
@@ -27,9 +30,6 @@ from pipeline.objects import Image, FinalResultOverlay, IDs, LocalizerInputImage
     CrownOverlay, SaliencyOverlay
 from pipeline.stages import ResultCrownVisualizer
 
-mpl.use('Agg')  # noqa
-import matplotlib.pyplot as plt
-import seaborn as sns
 sns.set_style('whitegrid')
 
 
@@ -255,10 +255,8 @@ class ImageHandler:
     def process_image(self, path, fname):
         im = imread(path)
         camIdx = fname.split('.')[0][-1]
-        im = rot90(im, self.rotations[int(camIdx)])
+        im = rot90(im, self.rotations[int(camIdx)]).astype(np.uint8).copy()
         orig_im = np.copy(im)
-        img_adapteq = exposure.equalize_adapthist(im, clip_limit=0.01)
-        im = np.round(img_adapteq * 255).astype(np.uint8)
 
         results = self.run_pipeline(im)
         dt = get_localtime()
@@ -270,7 +268,8 @@ class ImageHandler:
         pickle.dump(self.detections, open(self.detections_path, 'wb'))
         self.plot_detections()
 
-        img_with_overlay = self.crown.add_overlay(img_adapteq, results[CrownOverlay])
+        img_with_overlay = self.crown.add_overlay(im.astype(np.float64) / 255,
+                                                  results[CrownOverlay])
         saliency_overlay = results[SaliencyOverlay]
 
         self.builder.save_image('detections_cam{}'.format(camIdx),
