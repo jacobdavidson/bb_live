@@ -20,16 +20,17 @@ from datetime import datetime
 from scipy.interpolate import interp1d
 from skimage import exposure
 
-mpl.use('Agg')
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set_style('whitegrid')
-
 from bb_binary import parse_image_fname_beesbook, get_timezone
 from pipeline import Pipeline
 from pipeline.pipeline import get_auto_config
-from pipeline.objects import Image, FinalResultOverlay, IDs, LocalizerInputImage, CrownOverlay, SaliencyOverlay
+from pipeline.objects import Image, FinalResultOverlay, IDs, LocalizerInputImage, \
+    CrownOverlay, SaliencyOverlay
 from pipeline.stages import ResultCrownVisualizer
+
+mpl.use('Agg')  # noqa
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set_style('whitegrid')
 
 
 def timeit(method):
@@ -41,25 +42,31 @@ def timeit(method):
         return result
     return timed
 
+
 def get_b64_uri(bytes, format):
     src = 'data:image/{0};base64,{1}'
     return src.format(format, b64encode(bytes.getvalue()).decode('utf-8'))
+
 
 def get_image_bytes(image, format='jpeg'):
     b = BytesIO()
     imsave(b, image, format)
     return b
 
+
 def get_fig_bytes(format='png', **kwargs):
     b = BytesIO()
     plt.savefig(b, bbox_inches='tight', format=format, **kwargs)
     return b
 
+
 def localize(dt):
     return pytz.timezone('UTC').localize(dt).astimezone(get_timezone())
 
+
 def get_localtime():
     return localize(datetime.now())
+
 
 class ImgTemplate:
     def __init__(self, id=None, src=None, alt=None, header=None, reload_interval=30000):
@@ -81,14 +88,14 @@ class TabTemplate:
         self.rows = [RowTemplate(num_cols) for _ in range(num_rows)]
         self.set_active_on_load(active_on_load)
 
-
     def set_active_on_load(self, active_flag=False):
         self.div_class_extras = 'in active' if active_flag else ''
         self.li_class_extras = 'active' if active_flag else ''
 
 
 class SectionTemplate:
-    def __init__(self, name, header=None, tabs=None, grid_class='col-xs-12 col-sm-12 col-md-6 col-lg-6'):
+    def __init__(self, name, header=None, tabs=None,
+                 grid_class='col-xs-12 col-sm-12 col-md-6 col-lg-6'):
         self.name = name
         self.header = header
         self.grid_class = grid_class
@@ -107,7 +114,8 @@ class SiteBuilder:
         self.output_fname = os.path.join(output_path, template)
         self.uris = defaultdict(str)
 
-        image_tabs = [TabTemplate(name, 2, 2) for name in ('detections', 'decodings', 'inputs', 'saliencies')]
+        image_tabs = [TabTemplate(name, 2, 2) for name in ('detections', 'decodings',
+                                                           'inputs', 'saliencies')]
         image_tabs[0].set_active_on_load(True)
         image_section = SectionTemplate('images', header=None, tabs=image_tabs)
 
@@ -115,13 +123,16 @@ class SiteBuilder:
                      TabTemplate('population', 1, 1),
                      TabTemplate('age', 1, 1)]
         hive_section = SectionTemplate('hive', header='Hive statistics over time',
-                                       tabs=hive_tabs, grid_class='col-xs-12 col-sm-12 col-md-12 col-lg-12')
+                                       tabs=hive_tabs,
+                                       grid_class='col-xs-12 col-sm-12 col-md-12 col-lg-12')
 
-        metrics_tabs = [TabTemplate(name, 1, 1) for name in ('smd', 'variance', 'noise', 'contrast', \
+        metrics_tabs = [TabTemplate(name, 1, 1) for name in ('smd', 'variance',
+                                                             'noise', 'contrast',
                                                              'cratio', 'cratioMinMax')]
         metrics_tabs[0].set_active_on_load(True)
         metrics_section = SectionTemplate('metrics', header='Image statistics over time',
-                                          tabs=metrics_tabs, grid_class='col-xs-12 col-sm-12 col-md-12 col-lg-12')
+                                          tabs=metrics_tabs,
+                                          grid_class='col-xs-12 col-sm-12 col-md-12 col-lg-12')
 
         self.sections = [image_section, hive_section, metrics_section]
 
@@ -158,7 +169,9 @@ class SiteBuilder:
         image_template.header = header
 
     def build(self):
-        html = self.template.render(last_updated=get_localtime(), sections=self.sections, **self.uris)
+        html = self.template.render(last_updated=get_localtime(),
+                                    sections=self.sections,
+                                    **self.uris)
         open(self.output_fname, 'w').write(html)
 
 
@@ -185,7 +198,8 @@ class ImageHandler:
 
     @timeit
     def plot_detections(self, num_plot_samples=1000, std_window_size=25):
-        detections = pd.DataFrame(self.detections, columns=('datetime', 'camIdx', 'id', 'confidence'))
+        detections = pd.DataFrame(self.detections, columns=('datetime', 'camIdx',
+                                                            'id', 'confidence'))
 
         minTs = detections.datetime.min().timestamp()
         maxTs = detections.datetime.max().timestamp()
@@ -194,16 +208,19 @@ class ImageHandler:
         sumValues = None
 
         for camIdx in (0, 1, 2, 3):
-            x = np.array([ts.timestamp() for ts in \
-                          detections[detections.camIdx == str(camIdx)].groupby('datetime').id.agg(len).keys()])
+            x = np.array([ts.timestamp() for ts in
+                          detections[detections.camIdx == str(camIdx)]
+                            .groupby('datetime').id.agg(len).keys()])
             y = detections[detections.camIdx == str(camIdx)].groupby('datetime').id.agg(len).values
             if len(x) < 2:
                 continue
             f = interp1d(x, y, fill_value='extrapolate')
-            dts = np.arange(minTs, maxTs, step=((maxTs - minTs) / num_plot_samples)).astype(np.float64)
+            dts = np.arange(minTs, maxTs, step=((maxTs - minTs) / num_plot_samples))
+            dts = dts.astype(np.float64)
             values = f(dts)
-            df = pd.DataFrame([(localize(datetime.fromtimestamp(dt)), val) for dt, val in zip(dts, values)],
-                              columns=('datetime', 'cam{}'.format(camIdx)))
+            df = pd.DataFrame(
+                [(localize(datetime.fromtimestamp(dt)), val) for dt, val in zip(dts, values)],
+                columns=('datetime', 'cam{}'.format(camIdx)))
             df.plot(ax=ax)
 
             if sumValues is None:
@@ -212,8 +229,9 @@ class ImageHandler:
                 sumValues += values
 
         if sumValues is not None:
-            df = pd.DataFrame([(datetime.fromtimestamp(dt), val) for dt, val in zip(dts, sumValues)],
-                              columns=('datetime', 'combined'))
+            df = pd.DataFrame(
+                [(datetime.fromtimestamp(dt), val) for dt, val in zip(dts, sumValues)],
+                columns=('datetime', 'combined'))
             df.plot(ax=ax, yerr=df.combined.rolling(window=std_window_size, min_periods=0).std(),
                     ecolor=tuple(list(sns.color_palette()[4]) + [0.3]))
 
@@ -246,7 +264,8 @@ class ImageHandler:
         dt = get_localtime()
         for id in results[IDs]:
             confidence = np.min(np.abs(0.5 - id)) * 2
-            self.detections.append((dt, camIdx, int(''.join([str(c) for c in np.round(id).astype(np.int)])),
+            self.detections.append((dt, camIdx, int(''.join([str(c) for c in
+                                                             np.round(id).astype(np.int)])),
                                     confidence))
         pickle.dump(self.detections, open(self.detections_path, 'wb'))
         self.plot_detections()
@@ -254,10 +273,18 @@ class ImageHandler:
         img_with_overlay = self.crown.add_overlay(img_adapteq, results[CrownOverlay])
         saliency_overlay = results[SaliencyOverlay]
 
-        self.builder.save_image('detections_cam{}'.format(camIdx), results[FinalResultOverlay], format='jpeg')
-        self.builder.save_image('decodings_cam{}'.format(camIdx), img_with_overlay, format='jpeg')
-        self.builder.save_image('saliencies_cam{}'.format(camIdx), saliency_overlay, format='jpeg')
-        self.builder.save_image('inputs_cam{}'.format(camIdx), orig_im, format='jpeg')
+        self.builder.save_image('detections_cam{}'.format(camIdx),
+                                results[FinalResultOverlay],
+                                format='jpeg')
+        self.builder.save_image('decodings_cam{}'.format(camIdx),
+                                img_with_overlay,
+                                format='jpeg')
+        self.builder.save_image('saliencies_cam{}'.format(camIdx),
+                                saliency_overlay,
+                                format='jpeg')
+        self.builder.save_image('inputs_cam{}'.format(camIdx),
+                                orig_im,
+                                format='jpeg')
 
         self.builder.save_tab_image('cam{}'.format(camIdx), 'detections', 'images',
                                     camIdx, format='jpeg', header='Cam{}'.format(camIdx))
@@ -271,7 +298,8 @@ class ImageHandler:
 
 class AnalysisHandler:
     def __init__(self, source_dir, site_builder,
-                 analysis_metrics=('filename', 'smd', 'variance', 'noise', 'contrast', 'cratio', 'cratioMinMax')):
+                 analysis_metrics=('filename', 'smd', 'variance', 'noise',
+                                   'contrast', 'cratio', 'cratioMinMax')):
         self.builder = site_builder
         self.analysis_metrics = analysis_metrics
         self.analysis_paths = [os.path.join(source_dir, f) for f in
@@ -284,7 +312,7 @@ class AnalysisHandler:
             analysis = pd.read_csv(fn, sep='\t', names=self.analysis_metrics)
             analysis['camIdx'] = [parse_image_fname_beesbook(s)[0] for s in analysis['filename']]
             analysis['datetime'] = [localize(pd.datetime.fromtimestamp(
-                    parse_image_fname_beesbook(s)[1])) for s in analysis['filename']]
+                parse_image_fname_beesbook(s)[1])) for s in analysis['filename']]
             dfs.append(analysis)
         analysis = pd.concat(dfs)
         analysis.sort_values('datetime', inplace=True)
@@ -295,9 +323,9 @@ class AnalysisHandler:
         for column in self.analysis_metrics[1:]:
             fig, ax = plt.subplots(1, figsize=(16, 4), facecolor='white')
             for camIdx in (0, 1, 2, 3):
-                analysis[analysis.camIdx==camIdx].plot('datetime', column,
-                                                       label='cam{}'.format(camIdx),
-                                                       title=column, ax=ax)
+                analysis[analysis.camIdx == camIdx].plot('datetime', column,
+                                                         label='cam{}'.format(camIdx),
+                                                         title=column, ax=ax)
             ax.legend(loc='upper left')
             ax.set_xlabel('time')
             self.builder.update_uri(column, get_b64_uri(get_fig_bytes(), format='png'))
@@ -327,7 +355,8 @@ class PeriodicHiveAnalysis:
         # convert to decimal id using 11 least significant bits
         decimal_ids = [int(''.join([str(c) for c in id[:11]]), 2) for id in adjusted_ids]
 
-        # determine what kind of parity bit was used and add 2^11 to decimal id uneven parity bit was used
+        # determine what kind of parity bit was used and add 2^11 to decimal id
+        # uneven parity bit was used
         decimal_ids = np.array(decimal_ids)
         decimal_ids[(np.sum(adjusted_ids, axis=1) % 2) == 1] += 2048
 
@@ -350,18 +379,25 @@ class PeriodicHiveAnalysis:
     @timeit
     def plot_analysis(self, unique_detections_hourly, time_delta):
         fig, ax = plt.subplots(1, 1, figsize=(16, 4), facecolor='white')
-        median_detections = unique_detections_hourly.rolling(center=False, min_periods=2, window=10).median()
-        std_detections = unique_detections_hourly.rolling(center=False, window=10, min_periods=2).std()
-        ax.fill_between(median_detections.index,
-                        median_detections.Uniques.as_matrix().flatten() - 2 * std_detections.as_matrix().flatten(),
-                        median_detections.Uniques.as_matrix().flatten() + 2 * std_detections.as_matrix().flatten(),
-                        alpha=0.2)
+        median_detections = unique_detections_hourly.rolling(
+            center=False, min_periods=2, window=10).median()
+        std_detections = unique_detections_hourly.rolling(
+            center=False, window=10, min_periods=2).std()
+        medians_flat = median_detections.Uniques.as_matrix().flatten()
+        stds_flat = std_detections.as_matrix().flatten()
+        ax.fill_between(
+            median_detections.index,
+            medians_flat - 2 * stds_flat,
+            medians_flat + 2 * stds_flat,
+            alpha=0.2)
         median_detections.plot(ax=ax, legend=False,
-                             title='Number of bees in colony'.format(int(time_delta.total_seconds() // 3600)))
+                               title='Number of bees in colony'.format(
+                                   int(time_delta.total_seconds() // 3600)))
         nticks = 12
         xticks = pd.date_range(start=unique_detections_hourly.index[0],
                                end=unique_detections_hourly.index[-1],
-                               freq=(unique_detections_hourly.index[-1] - unique_detections_hourly.index[0]) / nticks)
+                               freq=(unique_detections_hourly.index[-1] -
+                                     unique_detections_hourly.index[0]) / nticks)
         ax.set_xticks(xticks)
         ax.set_xticklabels([dt.strftime('%a %H:%M:%S') for dt in xticks])
         ax.set_ylim((ax.get_ylim()[0] - 10, ax.get_ylim()[-1] + 10))
@@ -396,8 +432,9 @@ class PeriodicHiveAnalysis:
 
     @timeit
     def analyse_age_distribution(self, unique, counts):
-        urllib.request.urlretrieve('https://www.dropbox.com/s/ze3chu5mvetjwv2/TagsControl2016.xlsx?dl=1',
-                                   'TagsControl2016.xlsx')
+        urllib.request.urlretrieve(
+            'https://www.dropbox.com/s/ze3chu5mvetjwv2/TagsControl2016.xlsx?dl=1',
+            'TagsControl2016.xlsx')
 
         age_data = pd.read_excel('TagsControl2016.xlsx')
         age_data.drop('Unnamed: 0', axis=1, inplace=True)
@@ -429,7 +466,8 @@ class PeriodicHiveAnalysis:
         try:
             # load bb_live detections and convert to pandas dataframe
             detections = pickle.load(open(self.detections_path, 'rb'))
-            detections = pd.DataFrame(detections, columns=('datetime', 'camIdx', 'id', 'confidence'))
+            detections = pd.DataFrame(detections, columns=('datetime', 'camIdx',
+                                                           'id', 'confidence'))
 
             # remove old detections without valid confidence
             detections = detections[detections.confidence > -1]
@@ -441,7 +479,8 @@ class PeriodicHiveAnalysis:
 
             unique_detections_hourly_list = []
 
-            for end_time in pd.date_range(start=start_time, end=detections.datetime[-1], freq=pd.Timedelta(10, 'm')):
+            for end_time in pd.date_range(start=start_time, end=detections.datetime[-1],
+                                          freq=pd.Timedelta(10, 'm')):
                 # only use detections from last 24 hours
                 detection_range = detections[(detections.datetime >= end_time - time_delta) &
                                              (detections.datetime < end_time)]
@@ -451,7 +490,8 @@ class PeriodicHiveAnalysis:
 
                 unique_detections_hourly_list.append((end_time, len(unique)))
 
-            unique_detections_hourly = pd.DataFrame(unique_detections_hourly_list, columns=('Date', 'Uniques'))
+            unique_detections_hourly = pd.DataFrame(unique_detections_hourly_list,
+                                                    columns=('Date', 'Uniques'))
             unique_detections_hourly.set_index(unique_detections_hourly.Date, inplace=True)
             unique_detections_hourly.drop('Date', axis=1, inplace=True)
 
@@ -466,7 +506,8 @@ class PeriodicHiveAnalysis:
 
 class FileEventHandler(pyinotify.ProcessEvent):
     def __init__(self, source_dir, site_builder, min_interval):
-        self.access_history = defaultdict(lambda: get_timezone().localize(datetime.fromtimestamp(0)))
+        self.access_history = defaultdict(
+            lambda: get_timezone().localize(datetime.fromtimestamp(0)))
         self.builder = site_builder
         self.hndl_analysis = AnalysisHandler(source_dir, self.builder)
         self.hndl_image = ImageHandler(self.builder)

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import json
 import logging
 import pyinotify
 
@@ -10,11 +9,11 @@ from bb_live import FileEventHandler, SiteBuilder, PeriodicHiveAnalysis
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create a static beesbook live view website')
-    parser.add_argument("source_dir", help="Path to directory where live preview images and " + \
+    parser.add_argument("source_dir", help="Path to directory where live preview images and " +
                                            "analysis files are stored", type=str)
     parser.add_argument("output_path", help="Path to static html output file", type=str)
-    parser.add_argument("--interval", help="Ignore file events that occur more frequently than " + \
-                                         "this interval", default=30, type=int)
+    parser.add_argument("--interval", help="Ignore file events that occur more frequently than " +
+                                           "this interval", default=30, type=int)
     parser.add_argument("--debug", help="Print debug logging messages", default=False, type=bool)
 
     args = parser.parse_args()
