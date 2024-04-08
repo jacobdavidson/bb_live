@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bb_live"
+version = "0.0.2"
+dependencies = [
+    "numpy>=1.10.2",
+    "scipy>=0.16.1",
+    "Jinja2>=2.8",
+    "pytz>=2014.0",
+    "matplotlib>=1.5.0",
+    "seaborn>=0.7.0",
+    "pyinotify>=0.9.0",
+    "saliency-localizer @ git+https://github.com/nebw/saliency-localizer.git",
+    "bb_binary @ git+https://github.com/BioroboticsLab/bb_binary.git",
+    "bb_pipeline @ git+https://github.com/BioroboticsLab/bb_pipeline.git",
+]
+
+[tool.setuptools]
+packages = ["bb_live"]
+
+[project.scripts]
+bb_live = "bb_live.bin.run:main"
+

@@ -7,7 +7,7 @@ import pyinotify
 from bb_live import FileEventHandler, SiteBuilder, PeriodicHiveAnalysis
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='Create a static beesbook live view website')
     parser.add_argument("source_dir", help="Path to directory where live preview images and " +
                                            "analysis files are stored", type=str)
@@ -31,3 +31,6 @@ if __name__ == '__main__':
     hive_analysis.run_periodic()
 
     notifier.loop()
+
+if __name__ == '__main__':
+    main()
